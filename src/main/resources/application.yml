@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: ocr4j-compare
+  main:
+    banner-mode: console
+
+ocr:
+  # Model Resource Configuration
+  model:
+    base-dir: src/main/resources/models/ppocr-v6/tiny
+    det-model-path: src/main/resources/models/ppocr-v6/tiny/det.onnx
+    rec-model-path: src/main/resources/models/ppocr-v6/tiny/rec.onnx
+    dict-path: src/main/resources/models/ppocr-v6/tiny/dict.txt
+    det-url: https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/tmp/PP-OCRv6_tiny_det_onnx.tar
+    rec-url: https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/tmp/PP-OCRv6_tiny_rec_0515_onnx.tar
+    dict-url: https://raw.githubusercontent.com/AIwork4me/ppocrv6_onnx/master/models/rec_char_dict.txt
+    dict-backup-url: https://raw.githubusercontent.com/lets-mica/mica-ppocr/master/models/ppocr-v6/tiny/dict.txt
+
+  # Text Detection Configuration
+  detection:
+    limit-side-len: 64
+    limit-type: min
+    max-side-limit: 960
+    thresh: 0.3
+    box-thresh: 0.6
+    unclip-ratio: 1.5
+
+  # Text Recognition Configuration
+  recognition:
+    batch-size: 6
+    prefer-accelerator: false
+
+  # Global Runtime & Threading Configuration
+  runtime:
+    intra-op-num-threads: 1
+    inter-op-num-threads: 1
+    use-cls: false
+    use-vertical-padding: false
+
+  # Benchmark & Test Execution Settings
+  benchmark:
+    auto-run-on-startup: true
+    concurrencies:
+      - 1
+      - 2
+      - 4
+    requests-per-bench: 30
+    warmup-requests: 3
+    stability-requests: 200
+    images-base-dir: src/main/resources/images
+    output-readme: README.md
