@@ -39,6 +39,10 @@
             <AppenderRef ref="Console"/>
         </Logger>
 
+        <Logger name="io.xberg" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+
         <!-- Spring Boot Logger -->
         <Logger name="org.springframework.boot" level="INFO" additivity="false">
             <AppenderRef ref="Console"/>

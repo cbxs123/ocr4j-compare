@@ -3,6 +3,7 @@ package com.compare.ocr.service;
 import com.compare.ocr.config.OcrProperties;
 import com.compare.ocr.engine.MicaPPOcrAdapter;
 import com.compare.ocr.engine.RapidOcr4jAdapter;
+import com.compare.ocr.engine.XbergOcrAdapter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -28,5 +29,13 @@ public class OcrEngineFactory {
 
     public RapidOcr4jAdapter createRapidEngine(int threads) {
         return new RapidOcr4jAdapter(properties, threads);
+    }
+
+    public XbergOcrAdapter createXbergEngine() {
+        return createXbergEngine(properties.getRuntime().getIntraOpNumThreads());
+    }
+
+    public XbergOcrAdapter createXbergEngine(int threads) {
+        return new XbergOcrAdapter(properties, threads);
     }
 }

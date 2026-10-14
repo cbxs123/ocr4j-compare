@@ -37,6 +37,22 @@ ocr:
     use-cls: false
     use-vertical-padding: false
 
+  # Xberg engine (bundled binding library, ONNX Runtime and PP-OCRv6 models)
+  xberg:
+    runtime-dir: target/xberg-runtime
+    backend: paddle-ocr
+    language: ch
+    model-tier: tiny
+    model-version: pp-ocrv6
+    # 留空表示落地 jar 内置的全部模型快照
+    model-revision:
+    # Xberg 内部线程池总预算；0 = 交给 Xberg（默认 min(CPU 核数, 8)，8 核以上机器用不满）
+    max-threads: 0
+    # 并发 OCR 会话上限；0 = 跟随 max-threads。进程内首次抽取后固定，调整需重启进程
+    max-concurrent-ocr: 0
+    # 检测输入长边上限；0 = Xberg 默认 1024，可设为与 detection.max-side-limit 对齐
+    det-limit-side-len: 0
+
   # Benchmark & Test Execution Settings
   benchmark:
     auto-run-on-startup: true

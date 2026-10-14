@@ -11,7 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 public class OcrCompareApplication {
 
     public static void main(String[] args) {
-        log.info("Starting OcrCompareApplication (Spring Boot 2.7.2)...");
+        log.info("Starting OcrCompareApplication (Spring Boot 3.5.6 / JDK 21 / preview)...");
         SpringApplication.run(OcrCompareApplication.class, args);
     }
 }
