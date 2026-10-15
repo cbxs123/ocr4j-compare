@@ -1,7 +1,9 @@
 package com.compare.ocr.engine;
 
 import com.compare.ocr.config.OcrProperties;
+import io.xberg.AccelerationConfig;
 import io.xberg.ConcurrencyConfig;
+import io.xberg.ExecutionProviderType;
 import io.xberg.ExtractInput;
 import io.xberg.ExtractInputKind;
 import io.xberg.ExtractedDocument;
@@ -9,12 +11,20 @@ import io.xberg.ExtractionConfig;
 import io.xberg.ExtractionResult;
 import io.xberg.MimeDetectionPolicy;
 import io.xberg.OcrConfig;
+import io.xberg.OutputFormat;
+import io.xberg.PaddleInferenceBackend;
 import io.xberg.PaddleOcrConfig;
 import io.xberg.Xberg;
 import io.xberg.XbergRsException;
 import io.xberg.XbergRuntime;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -65,6 +75,18 @@ public class XbergOcrAdapter implements OcrEngineAdapter {
         if (xberg.getDetLimitSideLen() > 0) {
             paddleBuilder.withDetLimitSideLen(xberg.getDetLimitSideLen());
         }
+        // 以下四项此前均走 Xberg 默认值（面向文档智能设计），现按纯 OCR 基准显式接管
+        paddleBuilder.withEnableTableDetection(xberg.isEnableTableDetection());
+        if (xberg.getPadding() != null) {
+            paddleBuilder.withPadding(xberg.getPadding());
+        }
+        if (xberg.getDropScore() != null) {
+            paddleBuilder.withDropScore(xberg.getDropScore());
+        }
+        PaddleInferenceBackend inferenceBackend = parseInferenceBackend(xberg.getInferenceBackend());
+        if (inferenceBackend != null) {
+            paddleBuilder.withInferenceBackend(inferenceBackend);
+        }
 
         ExtractionConfig.Builder extractionBuilder = ExtractionConfig.builder()
                 .withMimeDetectionPolicy(MimeDetectionPolicy.PREFER_CONTENT)
@@ -74,6 +96,29 @@ public class XbergOcrAdapter implements OcrEngineAdapter {
                         .withPaddleOcrSettings(paddleBuilder.build())
                         .build())
                 .withForceOcr(true);
+        if (xberg.isLeanPipeline()) {
+            // 砍掉非 OCR 的流水线阶段：质量处理/质量门控/Markdown 转义/表格锚点/二维码/文档结构，
+            // 输出直接走 Plain，消除小图上约 200ms 的固定"流水线税"
+            extractionBuilder
+                    .withEnableQualityProcessing(false)
+                    .withOcrScannedPageQualityGate(false)
+                    .withOutputFormat(new OutputFormat.Plain())
+                    .withEscapeMarkdown(false)
+                    .withTableAnchors(false)
+                    .withQrCodes(false)
+                    .withIncludeDocumentStructure(false)
+                    .withUseLayoutForMarkdown(false);
+        }
+        ExecutionProviderType provider = parseAccelerationProvider(xberg.getAccelerationProvider());
+        if (provider != null) {
+            extractionBuilder.withAcceleration(AccelerationConfig.builder()
+                    .withProvider(provider)
+                    .withDeviceId(xberg.getAccelerationDeviceId())
+                    .build());
+        }
+        if (xberg.getMaxConcurrentExtractions() > 0) {
+            extractionBuilder.withMaxConcurrentExtractions((long) xberg.getMaxConcurrentExtractions());
+        }
         if (xberg.getMaxThreads() > 0 || xberg.getMaxConcurrentOcr() > 0) {
             ConcurrencyConfig.Builder concurrency = ConcurrencyConfig.builder();
             if (xberg.getMaxThreads() > 0) {
@@ -167,6 +212,68 @@ public class XbergOcrAdapter implements OcrEngineAdapter {
         }
 
         return new OcrEngineResult(fullText, lineCount, end - start, 0, 0);
+    }
+
+    /**
+     * 预热：用一张内存生成的占位小图触发 det/rec（及可选角度）ONNX 会话的建立与首帧 JIT，
+     * 把约 1.5s 的惰性建会话成本移出后续测量/服务阶段。
+     *
+     * @param rounds 预热次数，建议 ≥2（第 1 轮建会话，之后收敛到稳态）
+     * @return 全部预热轮次的总耗时（毫秒）
+     */
+    public long warmup(int rounds) {
+        byte[] probe = warmupProbeImage();
+        long totalMs = 0L;
+        for (int i = 0; i < rounds; i++) {
+            long start = System.nanoTime();
+            run(probe);
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            totalMs += ms;
+            log.info("Xberg warmup round {}/{}: {} ms", i + 1, rounds, ms);
+        }
+        return totalMs;
+    }
+
+    private static byte[] warmupProbeImage() {
+        try {
+            BufferedImage image = new BufferedImage(160, 40, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = image.createGraphics();
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
+            graphics.setColor(Color.BLACK);
+            graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 20));
+            graphics.drawString("OCR", 10, 28);
+            graphics.dispose();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(image, "png", out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new IllegalStateException("Xberg warmup probe image generation failed", e);
+        }
+    }
+
+    private static PaddleInferenceBackend parseInferenceBackend(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return PaddleInferenceBackend.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Unknown xberg.inference-backend '{}', fallback to Xberg default", value);
+            return null;
+        }
+    }
+
+    private static ExecutionProviderType parseAccelerationProvider(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return ExecutionProviderType.valueOf(value.trim().toUpperCase().replace('-', '_'));
+        } catch (IllegalArgumentException e) {
+            log.warn("Unknown xberg.acceleration-provider '{}', fallback to CPU default", value);
+            return null;
+        }
     }
 
     @Override

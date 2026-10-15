@@ -47,14 +47,44 @@ ocr:
     # 留空表示落地 jar 内置的全部模型快照
     model-revision:
     # Xberg 内部线程池总预算（Rayon + ONNX Runtime intra-op，进程级共享）
-    # Xberg 默认 min(CPU 核数, 8)，8 核以上机器用不满整机，这里按宿主逻辑核数显式给足；
-    # 0 = 交回 Xberg 自动决定
-    max-threads: 4
-    # 并发 OCR 会话上限；0 = 跟随 max-threads（注意：未显式设置时该额度按启动瞬间的空闲内存下调，
-    # 并在进程内首次抽取后固定），调大/调小需重启进程
-    max-concurrent-ocr: 4
+    # Xberg 默认 min(CPU 核数, 8)，8 核以上机器用不满整机，这里按宿主逻辑核数给满。
+    # 对照实验（README 4.5）：预算=16 时中图 C=4 吞吐 9.36 QPS，是预算=4（4.12）的 2.3 倍；
+    # 进程级预算不随并发度翻倍，16 逻辑核可全部用满。0 = 交回 Xberg 自动决定
+    max-threads: 16
+    # 并发 OCR 会话上限；0 = 跟随 max-threads（§5.2 实测限制到 4 会显著压低吞吐，
+    # 因此不再显式压低，让会话额度跟随线程预算；注意该额度在进程内首次抽取后固定）
+    max-concurrent-ocr: 0
     # 检测网络输入长边上限，与 detection.max-side-limit 对齐；0 = Xberg 默认 1024
     det-limit-side-len: 960
+
+    # ---- P0 流水线瘦身：关闭面向「文档智能」而非「纯 OCR」的阶段 ----
+    # true: 关闭质量处理/扫描页质量门控，输出走 Plain（跳过 Markdown 转义、表格锚点、
+    # 二维码识别、文档结构组织）。实测（09:47 轮）：收益集中在并发排队场景
+    # （中图 C=4 +26%、稳定性串行 -30% 延迟），小图单页仅省 ~26ms ——
+    # 单页延迟由 det+rec 推理时长主导，不是流水线税
+    lean-pipeline: true
+    # 表格检测：Xberg 面向文档理解默认开启，纯文本基准显式关闭
+    enable-table-detection: false
+    # ONNX 推理后端：留空 = Xberg 默认(ort)；tract 为纯 Rust 推理，可避免 ORT intra-op 超订
+    inference-backend:
+    # 识别置信度丢弃阈值 / 识别文本行裁剪 padding：注释掉 = 跟随 Xberg 默认
+    # drop-score:
+    # padding:
+    # GPU 加速 provider：留空 = CPU；可选 auto | core-ml | cuda | tensor-rt
+    acceleration-provider:
+    acceleration-device-id: 0
+    # 进程级抽取并发上限（背压阀门），0 = 不限制
+    max-concurrent-extractions: 0
+
+    # ---- P0 预热：把 3 个 ONNX 会话的惰性建立成本移出测量段（安排在冷启动测试之后）----
+    warmup-enabled: true
+    warmup-rounds: 2
+
+    # ---- P1 进程级分片：PaddleOCR 会话受进程级 mutex 保护，进程是并发的唯一扩展单位 ----
+    # >0: 并发基准结束后，启动 N 个 worker JVM 各跑 C=1 同图基准，聚合 QPS 与单进程对比；0 = 关闭
+    shard-processes: 2
+    shard-requests-per-worker: 20
+    shard-worker-threads: 2
 
   # Benchmark & Test Execution Settings
   benchmark:
@@ -64,7 +94,9 @@ ocr:
       - 2
       - 4
     requests-per-bench: 30
-    warmup-requests: 3
+    # Xberg 的 JIT + 原生会话完全热身比纯 Java 引擎慢，warmup=3 时 bench C=1 平均 496ms
+    # 与紧邻 warmup 的稳定性轮（230ms）差 2.2 倍，无法归因；提到 5 让 C=1 数据可比
+    warmup-requests: 5
     stability-requests: 200
     images-base-dir: src/main/resources/images
     output-readme: README.md

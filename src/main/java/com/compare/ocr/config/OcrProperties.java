@@ -63,6 +63,12 @@ public class OcrProperties {
         private int stabilityRequests = 200;
         private String imagesBaseDir = "src/main/resources/images";
         private String outputReadme = "README.md";
+        /** 分片子进程内部模式：{@code worker} 表示只跑一轮 Xberg C=1 基准并输出结果行后退出。 */
+        private String shardRole = "";
+        /** worker 模式使用的图片路径。 */
+        private String shardImage = "";
+        /** worker 模式的请求数。 */
+        private int shardRequests = 20;
     }
 
     /**
@@ -94,5 +100,32 @@ public class OcrProperties {
          * 与 mica-ppocr / RapidOCR4j 的 {@code detection.max-side-limit} 对齐。
          */
         private int detLimitSideLen = 0;
+        /**
+         * 纯 OCR 瘦身开关：true 时关闭质量处理、扫描页质量门控，
+         * 输出改用 {@code OutputFormat.Plain} 并跳过 Markdown 转义、表格锚点、
+         * 二维码识别与文档结构组织，砍掉面向文档智能的固定流水线开销。
+         */
+        private boolean leanPipeline = true;
+        /** 表格检测（PaddleOcrConfig.enableTableDetection），纯文本基准默认关闭。 */
+        private boolean enableTableDetection = false;
+        /** ONNX 推理后端：{@code ""} = Xberg 默认；{@code ort} | {@code tract}。 */
+        private String inferenceBackend = "";
+        /** 识别置信度丢弃阈值，{@code null} = Xberg 默认。 */
+        private Float dropScore;
+        /** 识别文本行裁剪 padding（像素），{@code null} = Xberg 默认。 */
+        private Integer padding;
+        /** 加速 provider：{@code ""} = CPU；{@code auto} | {@code core-ml} | {@code cuda} | {@code tensor-rt}。 */
+        private String accelerationProvider = "";
+        private int accelerationDeviceId = 0;
+        /** 进程级抽取并发上限（背压阀门），{@code 0} = 不设置。 */
+        private int maxConcurrentExtractions = 0;
+        /** 是否在冷启动测试之后执行预热，把 ONNX 会话惰性建立成本移出测量段。 */
+        private boolean warmupEnabled = true;
+        private int warmupRounds = 2;
+        /** 进程分片 worker 数，{@code 0} = 关闭分片验证。 */
+        private int shardProcesses = 0;
+        private int shardRequestsPerWorker = 20;
+        /** 分片 worker 进程内的 Xberg 线程预算（intra-op），刻意压小以体现「进程换线程」。 */
+        private int shardWorkerThreads = 2;
     }
 }

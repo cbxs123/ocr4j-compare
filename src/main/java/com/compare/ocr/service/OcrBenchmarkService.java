@@ -62,6 +62,17 @@ public class OcrBenchmarkService {
         coldStartResults.add(rapidColdStart);
         coldStartResults.add(xbergColdStart);
 
+        // 2.5 Xberg 预热：把 3 个 ONNX 会话的惰性建立成本（实测首帧 ~1500ms）移出后续测量段。
+        // 必须放在冷启动评测之后，否则会污染 ColdStart 的首帧口径。
+        OcrProperties.XbergProperties xbergProps = properties.getXberg();
+        if (xbergProps.isWarmupEnabled()) {
+            log.info("--- 1.5 Xberg Warmup (lazy ONNX sessions) ---");
+            try (XbergOcrAdapter xberg = engineFactory.createXbergEngine(intraThreads)) {
+                long warmupMs = xberg.warmup(xbergProps.getWarmupRounds());
+                log.info("Xberg warmup finished: rounds={} totalMs={}", xbergProps.getWarmupRounds(), warmupMs);
+            }
+        }
+
         // 3. Concurrency Benchmarks
         log.info("--- 2. Running Concurrency Benchmarks ---");
         List<BenchmarkResult> benchmarkResults = new ArrayList<>();
@@ -85,6 +96,26 @@ public class OcrBenchmarkService {
 
         BenchmarkConfig largeCfg = new BenchmarkConfig(2, Math.max(requestsPerBench / 2, 10), Math.max(warmup - 1, 1), "大图-密集文档 (1600x2200)", largeImg);
         benchmarkAll(runner, benchmarkResults, largeCfg, intraThreads);
+
+        // 3.5 进程级分片验证：Xberg PaddleOCR 会话受进程内 mutex 串行，进程是并发唯一扩展单位。
+        // 以 N 个 worker JVM（各 C=1、小线程预算）对比单进程 C=N 的 QPS，量化"进程换线程"的收益。
+        if (xbergProps.getShardProcesses() > 0) {
+            log.info("--- 2.5 Xberg Process-Shard Scaling ({} workers x C=1) ---", xbergProps.getShardProcesses());
+            String mediumImagePath = Paths.get(imgDir, "medium_card.png").toString();
+            XbergShardCoordinator.ShardSummary shards =
+                    XbergShardCoordinator.runShards(properties, mediumImagePath);
+            int targetC = xbergProps.getShardProcesses();
+            benchmarkResults.stream()
+                    .filter(r -> r.engineName().startsWith(XBERG_NAME)
+                            && r.concurrency() == targetC
+                            && r.sampleName().contains("中图"))
+                    .findFirst()
+                    .ifPresent(single -> log.info(
+                            "Shard comparison: {} workers x C=1 totalQps={} | single-process C={} qps={} | scaling {}x",
+                            shards.workers(), String.format("%.2f", shards.totalQps()),
+                            targetC, String.format("%.2f", single.qps()),
+                            String.format("%.2fx", shards.totalQps() / Math.max(single.qps(), 0.001))));
+        }
 
         // 4. Accuracy & Edge Case Testing
         log.info("--- 3. Evaluating Recognition Accuracy & Robustness ---");
