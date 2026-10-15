@@ -46,12 +46,15 @@ ocr:
     model-version: pp-ocrv6
     # 留空表示落地 jar 内置的全部模型快照
     model-revision:
-    # Xberg 内部线程池总预算；0 = 交给 Xberg（默认 min(CPU 核数, 8)，8 核以上机器用不满）
-    max-threads: 0
-    # 并发 OCR 会话上限；0 = 跟随 max-threads。进程内首次抽取后固定，调整需重启进程
-    max-concurrent-ocr: 0
-    # 检测输入长边上限；0 = Xberg 默认 1024，可设为与 detection.max-side-limit 对齐
-    det-limit-side-len: 0
+    # Xberg 内部线程池总预算（Rayon + ONNX Runtime intra-op，进程级共享）
+    # Xberg 默认 min(CPU 核数, 8)，8 核以上机器用不满整机，这里按宿主逻辑核数显式给足；
+    # 0 = 交回 Xberg 自动决定
+    max-threads: 4
+    # 并发 OCR 会话上限；0 = 跟随 max-threads（注意：未显式设置时该额度按启动瞬间的空闲内存下调，
+    # 并在进程内首次抽取后固定），调大/调小需重启进程
+    max-concurrent-ocr: 4
+    # 检测网络输入长边上限，与 detection.max-side-limit 对齐；0 = Xberg 默认 1024
+    det-limit-side-len: 960
 
   # Benchmark & Test Execution Settings
   benchmark:

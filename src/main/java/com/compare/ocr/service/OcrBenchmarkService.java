@@ -116,7 +116,8 @@ public class OcrBenchmarkService {
                 benchmarkResults,
                 coldStartResults,
                 stabilityResults,
-                accuracyResults
+                accuracyResults,
+                properties
         );
 
         String outputReadme = properties.getBenchmark().getOutputReadme();
