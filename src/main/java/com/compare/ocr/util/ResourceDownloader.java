@@ -50,6 +50,10 @@ public class ResourceDownloader {
         if (!Files.exists(recPath) || recPath.toFile().length() == 0) {
             downloadTarAndExtract(properties.getModel().getRecUrl(), recPath, modelBaseDir, "PP-OCRv6 tiny rec");
         }
+        Path docOriPath = Paths.get(properties.getModel().getDocOriModelPath());
+        if (properties.getRuntime().isUseCls()) {
+            downloadIfNotExists(docOriPath, properties.getModel().getDocOriUrl(), null, "doc_ori.onnx");
+        }
         downloadIfNotExists(dictPath, properties.getModel().getDictUrl(), properties.getModel().getDictBackupUrl(), "dict.txt");
     }
 

@@ -38,6 +38,7 @@ public class MicaPPOcrAdapter implements OcrEngineAdapter {
         String detModel = Paths.get(properties.getModel().getDetModelPath()).toAbsolutePath().toString();
         String recModel = Paths.get(properties.getModel().getRecModelPath()).toAbsolutePath().toString();
         String dictPath = Paths.get(properties.getModel().getDictPath()).toAbsolutePath().toString();
+        String docOriModel = Paths.get(properties.getModel().getDocOriModelPath()).toAbsolutePath().toString();
 
         PPOcrV6Config config = PPOcrV6Config.builder()
                 .detModelPath(detModel)
@@ -46,6 +47,7 @@ public class MicaPPOcrAdapter implements OcrEngineAdapter {
                 .intraOpNumThreads(intraOpNumThreads)
                 .interOpNumThreads(properties.getRuntime().getInterOpNumThreads())
                 .useDocOrientationClassify(properties.getRuntime().isUseCls())
+                .docOrientationModelPath(docOriModel)
                 .detLimitSideLen(properties.getDetection().getLimitSideLen())
                 .detLimitType(properties.getDetection().getLimitType())
                 .detMaxSideLimit(properties.getDetection().getMaxSideLimit())

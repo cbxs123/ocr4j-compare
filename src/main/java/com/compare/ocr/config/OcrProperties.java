@@ -24,8 +24,11 @@ public class OcrProperties {
         private String detModelPath = "src/main/resources/models/ppocr-v6/tiny/det.onnx";
         private String recModelPath = "src/main/resources/models/ppocr-v6/tiny/rec.onnx";
         private String dictPath = "src/main/resources/models/ppocr-v6/tiny/dict.txt";
+        /** mica 文档方向分类模型（4 类 PP-LCNet_x1_0_doc_ori），与行级 0/180 cls 模型不通用 */
+        private String docOriModelPath = "src/main/resources/models/ppocr-v6/tiny/doc_ori.onnx";
         private String detUrl = "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/tmp/PP-OCRv6_tiny_det_onnx.tar";
         private String recUrl = "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/tmp/PP-OCRv6_tiny_rec_0515_onnx.tar";
+        private String docOriUrl = "https://raw.githubusercontent.com/lets-mica/mica-ppocr/master/models/ppocr-v6/doc_ori/doc_ori.onnx";
         private String dictUrl = "https://raw.githubusercontent.com/AIwork4me/ppocrv6_onnx/master/models/rec_char_dict.txt";
         private String dictBackupUrl = "https://raw.githubusercontent.com/lets-mica/mica-ppocr/master/models/ppocr-v6/tiny/dict.txt";
     }

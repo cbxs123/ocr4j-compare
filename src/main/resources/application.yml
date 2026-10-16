@@ -11,6 +11,7 @@ ocr:
     det-model-path: src/main/resources/models/ppocr-v6/tiny/det.onnx
     rec-model-path: src/main/resources/models/ppocr-v6/tiny/rec.onnx
     dict-path: src/main/resources/models/ppocr-v6/tiny/dict.txt
+    doc-ori-model-path: src/main/resources/models/ppocr-v6/tiny/doc_ori.onnx
     det-url: https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/tmp/PP-OCRv6_tiny_det_onnx.tar
     rec-url: https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/tmp/PP-OCRv6_tiny_rec_0515_onnx.tar
     dict-url: https://raw.githubusercontent.com/AIwork4me/ppocrv6_onnx/master/models/rec_char_dict.txt
@@ -20,7 +21,7 @@ ocr:
   detection:
     limit-side-len: 64
     limit-type: min
-    max-side-limit: 960
+    max-side-limit: 1920
     thresh: 0.3
     box-thresh: 0.6
     unclip-ratio: 1.5
@@ -34,7 +35,7 @@ ocr:
   runtime:
     intra-op-num-threads: 1
     inter-op-num-threads: 1
-    use-cls: false
+    use-cls: true
     use-vertical-padding: false
 
   # Xberg engine (bundled binding library, ONNX Runtime and PP-OCRv6 models)
